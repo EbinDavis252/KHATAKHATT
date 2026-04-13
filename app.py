@@ -10,57 +10,64 @@ import urllib.parse
 # -------------------------------
 # CONFIG + PREMIUM UI BRANDING
 # -------------------------------
-st.set_page_config(page_title="KhataKhat AI", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="KhataKhat AI", layout="wide")
 
-# Ultra-Premium Dark Theme CSS
+# Premium Light/Corporate Theme CSS
 st.markdown("""
 <style>
-/* Deep Charcoal Background */
+/* Soft Premium Background */
 .stApp {
-    background-color: #0a0e17;
-    color: #e2e8f0;
+    background-color: #f8fafc;
+    color: #334155;
     font-family: 'Inter', 'Segoe UI', sans-serif;
 }
 /* Hide default Streamlit branding */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 
-/* Neon Accents for Headers */
+/* Professional Headers */
 h1, h2, h3 { 
-    color: #00e6b8 !important; 
+    color: #0f766e !important; 
     font-weight: 700; 
     letter-spacing: -0.5px;
 }
 
-/* Glassmorphism Metric Cards */
+/* Light Glassmorphism Metric Cards */
 div[data-testid="metric-container"] {
-    background: #111827;
-    border: 1px solid #1f2937;
-    border-left: 4px solid #00e6b8;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #0d9488;
     padding: 1.2rem;
     border-radius: 10px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     transition: transform 0.2s ease;
 }
 div[data-testid="metric-container"]:hover {
     transform: translateY(-2px);
 }
+div[data-testid="metric-container"] label {
+    color: #64748b !important;
+}
+div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
+    color: #0f172a !important;
+}
 
 /* Clean Tabs */
 button[data-baseweb="tab"] {
-    color: #9ca3af !important;
+    color: #64748b !important;
     font-size: 16px !important;
-    font-weight: 500;
+    font-weight: 600;
 }
 button[aria-selected="true"] {
-    color: #00e6b8 !important;
-    border-bottom: 2px solid #00e6b8 !important;
+    color: #0d9488 !important;
+    border-bottom: 2px solid #0d9488 !important;
 }
 
 /* Dataframe styling */
 .stDataFrame {
     border-radius: 8px;
     overflow: hidden;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -72,27 +79,20 @@ if "lang" not in st.session_state:
     st.session_state.lang = "English"
 
 def t(en_text, hi_text):
-    """Simple translation helper based on session state."""
     return en_text if st.session_state.lang == "English" else hi_text
 
-# Custom Jaankari Box (Bilingual Insights)
+# Custom Jaankari Box (Clean Light Theme)
 def jaankari_box(obs_en, act_en, obs_hi, act_hi):
     obs = obs_en if st.session_state.lang == "English" else obs_hi
     act = act_en if st.session_state.lang == "English" else act_hi
     
     st.markdown(f"""
-    <div style="background: linear-gradient(90deg, #111827 0%, #1f2937 100%); border-left: 4px solid #00e6b8; padding: 16px; border-radius: 6px; margin-top: 15px; margin-bottom: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-        <h4 style="color: #00e6b8; margin-top: 0px; margin-bottom: 4px; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">⚡ Jaankari (जानकारी)</h4>
-        <p style="font-size: 12px; color: #9ca3af; margin-bottom: 12px; font-style: italic;">AI-generated strategic insights based on your cash flow data.</p>
-        <p style="margin-bottom: 8px; font-size: 14px; color: #d1d5db;"><strong style="color: #ffffff;">{t('Observation:', 'स्थिति:')}</strong> {obs}</p>
-        <p style="margin-bottom: 0px; font-size: 14px; color: #d1d5db;"><strong style="color: #ffffff;">{t('Action Plan:', 'सुझाव:')}</strong> {act}</p>
+    <div style="background: #ffffff; border-left: 4px solid #0ea5e9; padding: 16px; border-radius: 6px; margin-top: 15px; margin-bottom: 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e0f2fe;">
+        <h4 style="color: #0369a1; margin-top: 0px; margin-bottom: 10px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;">⚡ Jaankari (जानकारी)</h4>
+        <p style="margin-bottom: 8px; font-size: 14px; color: #334155;"><strong style="color: #0f172a;">{t('Observation:', 'स्थिति:')}</strong> {obs}</p>
+        <p style="margin-bottom: 0px; font-size: 14px; color: #334155;"><strong style="color: #0f172a;">{t('Action Plan:', 'सुझाव:')}</strong> {act}</p>
     </div>
     """, unsafe_allow_html=True)
-
-
-title_text = t("💸 KhataKhat <span style='color: #ffffff; font-size: 24px; font-weight: 400;'>| Enterprise Receivables Engine</span>", 
-               "💸 KhataKhat <span style='color: #ffffff; font-size: 24px; font-weight: 400;'>| स्मार्ट व्यापार वसूली इंजन</span>")
-st.markdown(f"<h1>{title_text}</h1>", unsafe_allow_html=True)
 
 # -------------------------------
 # DATABASE
@@ -169,7 +169,6 @@ def calculate_credit_score(days, amount):
 
 def generate_ai_message(name, amount, days, category, industry):
     link = f"upi://pay?pa=merchant@upi&am={amount}"
-    
     if st.session_state.lang == "English":
         if category == "Low": return f"Hi {name}, a gentle reminder for your pending amount of Rs. {amount}. Pay here: {link}"
         elif category == "Medium": return f"Hello {name}, Rs. {amount} is currently pending. Most {industry} payments clear soon. Please complete yours: {link}"
@@ -189,27 +188,21 @@ def predict_recovery_probability(days, amount, category):
 def generate_pdf_report(df):
     pdf = FPDF()
     pdf.add_page()
-    
     def clean_txt(text):
         return str(text).replace("₹", "Rs.").encode('latin-1', 'ignore').decode('latin-1')
-    
     pdf.set_font("Arial", 'B', 18)
     pdf.cell(200, 10, txt="KhataKhat - Active Recovery Report", ln=True, align='C')
     pdf.set_font("Arial", size=10)
     pdf.cell(200, 10, txt=f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align='C')
     pdf.ln(5)
-    
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(200, 10, txt="Executive Overview:", ln=True)
     pdf.set_font("Arial", size=11)
-    
     total_due = df['Amount'].sum()
     expected_cash = df['Expected'].sum()
-    
     analysis_text = f"Total Pending Due: Rs. {total_due:,.0f} | AI Expected Recovery: Rs. {expected_cash:,.0f}"
     pdf.multi_cell(0, 6, txt=clean_txt(analysis_text))
     pdf.ln(10)
-    
     pdf.set_font("Arial", size=10)
     for index, row in df.iterrows():
         pdf.set_font("Arial", 'B', 10)
@@ -217,49 +210,63 @@ def generate_pdf_report(df):
         pdf.set_font("Arial", size=10)
         pdf.cell(0, 6, txt=clean_txt(f"Due: Rs. {row['Amount']} | Days Overdue: {row['Days']} | Risk: {row['Category']}"), ln=True)
         pdf.ln(4)
-        
     return pdf.output(dest="S").encode("latin-1")
 
 # -------------------------------
-# LOGIN / REGISTER
+# APP ROUTING & TOP NAVIGATION
 # -------------------------------
-st.sidebar.markdown("### 🌐 Language / भाषा")
-st.session_state.lang = st.sidebar.radio("", ["English", "हिंदी"], horizontal=True, label_visibility="collapsed")
-st.sidebar.markdown("---")
 
 if not st.session_state.logged_in:
-    st.sidebar.title(t("Secure Portal", "सुरक्षित पोर्टल"))
-    choice = st.sidebar.radio(t("Authentication", "लॉगिन विकल्प"), [t("Login", "लॉगिन"), t("Register", "नया खाता")])
-
-    if choice in ["Login", "लॉगिन"]:
-        user = st.text_input(t("Username", "यूज़रनेम"))
-        pwd = st.text_input(t("Password", "पासवर्ड"), type="password")
-        if st.button(t("Access Platform", "लॉगिन करें"), use_container_width=True):
-            if login_user(user, pwd):
-                st.session_state.logged_in = True
-                st.session_state.user = user
-                st.rerun()
-            else:
-                st.error(t("Invalid credentials", "गलत जानकारी"))
-    else:
-        new_user = st.text_input(t("New Username", "नया यूज़रनेम"))
-        new_pwd = st.text_input(t("New Password", "नया पासवर्ड"), type="password")
-        if st.button(t("Create Account", "खाता बनाएं"), use_container_width=True):
-            if create_user(new_user, new_pwd):
-                st.success(t("Account created successfully!", "खाता सफलतापूर्वक बन गया!"))
-            else:
-                st.error(t("User already exists", "यूज़र पहले से मौजूद है"))
-
-# -------------------------------
-# MAIN APP
-# -------------------------------
-else:
-    st.sidebar.title(t("Control Panel", "कंट्रोल पैनल"))
-    st.sidebar.markdown(f"{t('User:', 'यूज़र:')} **{st.session_state.user}**")
+    # --- LOGIN SCREEN ---
+    col_logo, col_lang = st.columns([3, 1])
+    with col_logo:
+        st.markdown(f"<h1>💸 KhataKhat</h1>", unsafe_allow_html=True)
+    with col_lang:
+        st.session_state.lang = st.radio("Language / भाषा", ["English", "हिंदी"], horizontal=True, label_visibility="collapsed")
     
-    if st.sidebar.button(t("Log Out", "लॉग आउट")):
-        st.session_state.logged_in = False
-        st.rerun()
+    st.markdown("---")
+    
+    col_login, col_empty = st.columns([1, 1])
+    with col_login:
+        st.markdown(f"### {t('Secure Portal', 'सुरक्षित पोर्टल')}")
+        choice = st.radio(t("Authentication", "लॉगिन विकल्प"), [t("Login", "लॉगिन"), t("Register", "नया खाता")], horizontal=True)
+
+        if choice in ["Login", "लॉगिन"]:
+            user = st.text_input(t("Username", "यूज़रनेम"))
+            pwd = st.text_input(t("Password", "पासवर्ड"), type="password")
+            if st.button(t("Access Platform", "लॉगिन करें"), type="primary"):
+                if login_user(user, pwd):
+                    st.session_state.logged_in = True
+                    st.session_state.user = user
+                    st.rerun()
+                else:
+                    st.error(t("Invalid credentials", "गलत जानकारी"))
+        else:
+            new_user = st.text_input(t("New Username", "नया यूज़रनेम"))
+            new_pwd = st.text_input(t("New Password", "नया पासवर्ड"), type="password")
+            if st.button(t("Create Account", "खाता बनाएं"), type="primary"):
+                if create_user(new_user, new_pwd):
+                    st.success(t("Account created successfully!", "खाता सफलतापूर्वक बन गया!"))
+                else:
+                    st.error(t("User already exists", "यूज़र पहले से मौजूद है"))
+
+else:
+    # --- MAIN DASHBOARD SCREEN ---
+    
+    # Top Navigation / Toolbar
+    nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([4, 2, 2, 1])
+    with nav_col1:
+        st.markdown(f"<h2>💸 KhataKhat <span style='color: #64748b; font-size: 20px; font-weight: 400;'>| {t('Enterprise Receivables', 'स्मार्ट व्यापार वसूली')}</span></h2>", unsafe_allow_html=True)
+    with nav_col2:
+        st.session_state.lang = st.radio("Language", ["English", "हिंदी"], horizontal=True, label_visibility="collapsed", key="lang_main")
+    with nav_col3:
+        st.markdown(f"<div style='text-align: right; padding-top: 5px; font-weight: bold;'>{t('User:', 'यूज़र:')} {st.session_state.user}</div>", unsafe_allow_html=True)
+    with nav_col4:
+        if st.button(t("Log Out", "लॉग आउट"), use_container_width=True):
+            st.session_state.logged_in = False
+            st.rerun()
+
+    st.markdown("<hr style='margin-top: 0px; margin-bottom: 20px;'>", unsafe_allow_html=True)
 
     tab_names = [t("📊 Macro Insights", "📊 बाज़ार की जानकारी"), t("💸 Recovery Engine", "💸 वसूली इंजन")]
     is_admin = st.session_state.user == "admin"
@@ -269,8 +276,6 @@ else:
 
     # ---------------- MARKET INSIGHTS ----------------
     with tabs[0]:
-        st.header(t("📊 Macro Intelligence", "📊 बाज़ार इंटेलिजेंस"))
-
         col1, col2, col3 = st.columns(3)
         col1.metric(t("Total Market Credit", "बाज़ार में कुल उधार"), f"₹{market_df['Amount'].sum():,.0f}")
         col2.metric(t("Total Capital Stuck", "कुल फंसा हुआ पैसा"), f"₹{market_df[market_df['Status']=='Delayed']['Amount'].sum():,.0f}")
@@ -280,10 +285,8 @@ else:
 
         with sub_tab1:
             data = market_df.groupby("Industry")["Credit_Days"].mean().reset_index()
-            fig = px.bar(data, x="Industry", y="Credit_Days", title=t("Credit Cycle by Industry", "उद्योग के अनुसार उधार के दिन"), color="Credit_Days", color_continuous_scale="Teal", template="plotly_dark")
-            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+            fig = px.bar(data, x="Industry", y="Credit_Days", title=t("Credit Cycle by Industry", "उद्योग के अनुसार उधार के दिन"), color="Credit_Days", color_continuous_scale="Teal", template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
-            
             jaankari_box(
                 "FMCG counterparties exhibit high liquidity, clearing within 15 days, whereas Textile buyers are extending credit cycles beyond a month.",
                 "Mandate a 50% upfront payment structure for all future Textile wholesale orders.",
@@ -293,10 +296,8 @@ else:
 
         with sub_tab2:
             data = market_df.groupby("City")["Days_Delayed"].mean().reset_index()
-            fig = px.bar(data, x="City", y="Days_Delayed", title=t("Capital Delay by Region", "शहर के अनुसार देरी"), color="Days_Delayed", color_continuous_scale="Reds", template="plotly_dark")
-            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+            fig = px.bar(data, x="City", y="Days_Delayed", title=t("Capital Delay by Region", "शहर के अनुसार देरी"), color="Days_Delayed", color_continuous_scale="Reds", template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
-            
             jaankari_box(
                 "Counterparties in Surat are severely stretching working capital cycles (+20 days delay). Delhi accounts remain highly liquid.",
                 "Reroute current inventory allocation to Delhi-based distributors.",
@@ -306,10 +307,8 @@ else:
 
         with sub_tab3:
             market_df["Risk"] = market_df["Days_Delayed"].apply(categorize)
-            fig = px.pie(market_df, names="Risk", title=t("Portfolio Risk Distribution", "रिस्क का बंटवारा"), hole=0.4, color="Risk", color_discrete_map={"High": "#ef4444", "Medium": "#f59e0b", "Low": "#10b981"}, template="plotly_dark")
-            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+            fig = px.pie(market_df, names="Risk", title=t("Portfolio Risk Distribution", "रिस्क का बंटवारा"), hole=0.4, color="Risk", color_discrete_map={"High": "#ef4444", "Medium": "#f59e0b", "Low": "#10b981"}, template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
-            
             jaankari_box(
                 "A significant tranche of receivables is currently flagged as 'High Risk', indicating high probability of default.",
                 "Suspend all credit extensions to High Risk profiles immediately.",
@@ -319,9 +318,7 @@ else:
 
     # ---------------- RECOVERY ENGINE ----------------
     with tabs[1]:
-        st.header(t("💸 Recovery Engine", "💸 वसूली इंजन"))
-        
-        st.markdown(f"<p style='color: #9ca3af;'>{t('Please upload your current receivables ledger. File must be named', 'कृपया अपना डेटा अपलोड करें। फ़ाइल का नाम होना चाहिए')} <b>udhaar_data.csv</b>.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color: #64748b;'>{t('Please upload your current receivables ledger. File must be named', 'कृपया अपना डेटा अपलोड करें। फ़ाइल का नाम होना चाहिए')} <b>udhaar_data.csv</b>.</p>", unsafe_allow_html=True)
         file = st.file_uploader("", type=["csv"])
 
         if file:
@@ -382,10 +379,8 @@ else:
                 st.markdown("<br>", unsafe_allow_html=True)
                 col_chart1, col_chart2 = st.columns(2)
                 with col_chart1:
-                    fig1 = px.bar(result_df, x="Name", y="Risk Score", title=t("Default Probability Index", "खतरे का स्कोर (ग्राहक अनुसार)"), color="Risk Score", color_continuous_scale="Turbo", template="plotly_dark")
-                    fig1.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    fig1 = px.bar(result_df, x="Name", y="Risk Score", title=t("Default Probability Index", "खतरे का स्कोर (ग्राहक अनुसार)"), color="Risk Score", color_continuous_scale="Turbo", template="plotly_white")
                     st.plotly_chart(fig1, use_container_width=True)
-                    
                     jaankari_box(
                         "Spikes in the DPI isolate accounts most likely to default.",
                         "Bypass automated channels for peak-risk accounts. Initiate direct phone contact.",
@@ -394,31 +389,21 @@ else:
                     )
                 
                 with col_chart2:
-                    fig2 = px.pie(result_df, names="Category", title=t("Exposure Segmentation", "अकाउंट रिस्क केटेगरी"), hole=0.4, color="Category", color_discrete_map={"High": "#ef4444", "Medium": "#f59e0b", "Low": "#10b981"}, template="plotly_dark")
-                    fig2.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    fig2 = px.pie(result_df, names="Category", title=t("Exposure Segmentation", "अकाउंट रिस्क केटेगरी"), hole=0.4, color="Category", color_discrete_map={"High": "#ef4444", "Medium": "#f59e0b", "Low": "#10b981"}, template="plotly_white")
                     st.plotly_chart(fig2, use_container_width=True)
-                    
                     jaankari_box(
                         "Visualizes total capital tied up across safety tiers.",
-                        "Deploy automated UPI links to 'Low' tier accounts. Reserve manual collections bandwidth for the 'High' tier.",
+                        "Deploy automated UPI links to 'Low' tier accounts. Reserve manual collections bandwidth.",
                         "यह चार्ट आपके ग्राहकों को सुरक्षित (Low) और खतरे (High) में बांटता है।",
-                        "सुरक्षित (Low) वालों के लिए ऑटोमैटिक व्हाट्सएप का इस्तेमाल करें। अपना समय हाई रिस्क वालों के लिए बचाएं।"
+                        "सुरक्षित वालों के लिए ऑटोमैटिक व्हाट्सएप का इस्तेमाल करें। अपना समय हाई रिस्क वालों के लिए बचाएं।"
                     )
 
                 # Forecast
                 result_df = result_df.sort_values(by="Expected", ascending=False)
                 result_df["Index"] = range(1, len(result_df) + 1)
                 result_df["Cum"] = result_df["Expected"].cumsum()
-                fig_line = px.area(result_df, x="Index", y="Cum", title=t("Liquidity Projection Curve", "इस हफ़्ते कैश फ्लो का अनुमान"), template="plotly_dark", color_discrete_sequence=["#00e6b8"])
-                fig_line.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                fig_line = px.area(result_df, x="Index", y="Cum", title=t("Liquidity Projection Curve", "इस हफ़्ते कैश फ्लो का अनुमान"), template="plotly_white", color_discrete_sequence=["#0ea5e9"])
                 st.plotly_chart(fig_line, use_container_width=True)
-                
-                jaankari_box(
-                    "This curve projects cumulative capital inflow based on AI intervention.",
-                    "Cap your own payable obligations based on the terminal value of this projection.",
-                    "अगर आप आज सबको रिमाइंडर भेजते हैं, तो यह लाइन दिखाती है कि बैंक में कितना पैसा आ सकता है।",
-                    "इस लाइन के सबसे ऊपर वाले नंबर को देखें। अपने सप्लायर्स को पैसे देने का वादा उसी आधार पर करें।"
-                )
 
                 # WhatsApp Hub
                 st.markdown("---")
@@ -430,9 +415,9 @@ else:
                 if selected_customer:
                     customer_info = result_df[result_df["Name"] == selected_customer].iloc[0]
                     st.markdown(f"""
-                    <div style="background: #1f2937; padding: 15px; border-radius: 5px; border-left: 3px solid #6366f1;">
-                        <span style="color: #6366f1; font-weight: bold; font-size: 12px;">{t('GENERATED COMMUNICATION DRAFT', 'तैयार किया गया मैसेज')}</span><br><br>
-                        <span style="color: #e2e8f0;">{customer_info['Message']}</span>
+                    <div style="background: #f1f5f9; padding: 15px; border-radius: 5px; border-left: 3px solid #6366f1;">
+                        <span style="color: #4f46e5; font-weight: bold; font-size: 12px;">{t('GENERATED COMMUNICATION DRAFT', 'तैयार किया गया मैसेज')}</span><br><br>
+                        <span style="color: #334155;">{customer_info['Message']}</span>
                     </div>
                     """, unsafe_allow_html=True)
                     st.markdown("<br>", unsafe_allow_html=True)
@@ -460,6 +445,15 @@ else:
                             conn.commit()
                             st.success(f"{t('Ledger updated: Capital from', 'अकाउंट अपडेट:')} {selected_customer} {t('recovered.', 'से पैसा मिल गया! ✅')}")
 
+                # Tracking Table
+                st.markdown("---")
+                st.subheader(t("📈 Active Recovery History", "📈 आपका रिकवरी इतिहास"))
+                history_df = pd.read_sql("SELECT customer, amount, due_date, status FROM transactions WHERE username=?", conn, params=(st.session_state.user,))
+                if not history_df.empty:
+                    st.dataframe(history_df, use_container_width=True)
+                else:
+                    st.info(t("No recovery records found. Sync data or log a transmission above.", "अभी तक कोई रिकवरी रिकॉर्ड नहीं है।"))
+
                 # PDF DOWNLOAD
                 st.markdown("---")
                 st.subheader(t("📄 Daily Batch Reporting", "📄 डेली रिपोर्ट"))
@@ -486,3 +480,12 @@ else:
             tx_data = pd.read_sql("SELECT * FROM transactions", conn)
             if not tx_data.empty: st.dataframe(tx_data, use_container_width=True)
             else: st.info(t("Ledger empty.", "डेटाबेस खाली है।"))
+
+# -------------------------------
+# COPYRIGHT FOOTER
+# -------------------------------
+st.markdown("""
+    <div style='text-align: center; margin-top: 50px; padding: 20px; color: #94a3b8; font-size: 14px;'>
+        Copyright by Ebin Davis
+    </div>
+""", unsafe_allow_html=True)
