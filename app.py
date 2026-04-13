@@ -127,11 +127,11 @@ def calculate_credit_score(days, amount):
 def generate_ai_message(name, amount, days, category, industry):
     link = f"upi://pay?pa=merchant@upi&am={amount}"
     if category == "Low":
-        return f"Hi {name}, reminder for ₹{amount}. Pay: {link}"
+        return f"Hi {name}, a gentle reminder for your pending amount of ₹{amount}. Pay here: {link}"
     elif category == "Medium":
-        return f"{name}, ₹{amount} pending. Most {industry} payments clear soon. Pay: {link}"
+        return f"Hello {name}, ₹{amount} is currently pending. Most {industry} payments clear soon. Please complete yours: {link}"
     else:
-        return f"⚠️ ₹{amount} overdue by {days} days. Immediate payment required: {link}"
+        return f"⚠️ URGENT: {name}, ₹{amount} is overdue by {days} days. Immediate payment is required to maintain your credit score: {link}"
 
 def predict_recovery_probability(days, amount, category):
     base = 0.8 - (days * 0.02)
@@ -148,8 +148,8 @@ def predict_recovery_probability(days, amount, category):
 # -------------------------------
 if not st.session_state.logged_in:
 
-    st.sidebar.title("Menu")
-    choice = st.sidebar.radio("Select", ["Login", "Register"])
+    st.sidebar.title("User Portal")
+    choice = st.sidebar.radio("Select Action", ["Login", "Register"])
 
     if choice == "Login":
         user = st.text_input("Username")
@@ -171,7 +171,7 @@ if not st.session_state.logged_in:
 
         if st.button("Register"):
             if create_user(new_user, new_pwd):
-                st.success("Account created!")
+                st.success("Account created successfully!")
             else:
                 st.error("User already exists")
 
@@ -180,48 +180,51 @@ if not st.session_state.logged_in:
 # -------------------------------
 else:
 
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Market Insights", "Recovery Engine"])
-
+    st.sidebar.title("Settings")
+    st.sidebar.markdown(f"Logged in as: **{st.session_state.user}**")
+    
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.rerun()
 
-    # ---------------- MARKET INSIGHTS ----------------
-    if page == "Market Insights":
+    # Replaced Navigation Sidebar with Main Tabs
+    tab_market, tab_recovery = st.tabs(["📊 Market Insights", "💸 Recovery Engine"])
 
+    # ---------------- MARKET INSIGHTS ----------------
+    with tab_market:
         st.header("📊 Market Intelligence")
 
         col1, col2, col3 = st.columns(3)
-        col1.metric("Total Credit", f"₹{market_df['Amount'].sum():,.0f}")
-        col2.metric("Overdue", f"₹{market_df[market_df['Status']=='Delayed']['Amount'].sum():,.0f}")
-        col3.metric("Avg Delay", f"{market_df['Days_Delayed'].mean():.1f} days")
+        col1.metric("Total Market Credit", f"₹{market_df['Amount'].sum():,.0f}")
+        col2.metric("Total Overdue", f"₹{market_df[market_df['Status']=='Delayed']['Amount'].sum():,.0f}")
+        col3.metric("Average Delay", f"{market_df['Days_Delayed'].mean():.1f} days")
 
-        tab1, tab2, tab3 = st.tabs(["Industry", "City", "Risk"])
+        sub_tab1, sub_tab2, sub_tab3 = st.tabs(["Industry Analysis", "City Analysis", "Risk Distribution"])
 
-        with tab1:
+        with sub_tab1:
             data = market_df.groupby("Industry")["Credit_Days"].mean().reset_index()
-            st.plotly_chart(px.bar(data, x="Industry", y="Credit_Days"))
+            fig = px.bar(data, x="Industry", y="Credit_Days", title="Average Allowed Credit Days by Industry")
+            st.plotly_chart(fig, use_container_width=True)
 
-        with tab2:
+        with sub_tab2:
             data = market_df.groupby("City")["Days_Delayed"].mean().reset_index()
-            st.plotly_chart(px.bar(data, x="City", y="Days_Delayed"))
+            fig = px.bar(data, x="City", y="Days_Delayed", title="Average Payment Delay Days by City")
+            st.plotly_chart(fig, use_container_width=True)
 
-        with tab3:
+        with sub_tab3:
             market_df["Risk"] = market_df["Days_Delayed"].apply(categorize)
-            st.plotly_chart(px.pie(market_df, names="Risk"))
+            fig = px.pie(market_df, names="Risk", title="Market Risk Profiles Distribution")
+            st.plotly_chart(fig, use_container_width=True)
 
     # ---------------- RECOVERY ENGINE ----------------
-    else:
-
+    with tab_recovery:
         st.header("💸 Recovery Engine")
 
-        file = st.file_uploader("Upload CSV", type=["csv"])
+        file = st.file_uploader("Upload Recovery Data CSV", type=["csv"])
 
         if file:
             df = pd.read_csv(file)
 
-            # Updated required_cols to check for Paid Amount too
             required_cols = ["Name", "Amount", "Paid Amount", "Due Date", "Industry", "City"]
             if not all(col in df.columns for col in required_cols):
                 st.error(f"CSV format incorrect. Required columns: {', '.join(required_cols)}")
@@ -230,10 +233,9 @@ else:
             results = []
 
             for _, row in df.iterrows():
-                # KD, here we calculate the actual pending amount!
                 pending_amount = row['Amount'] - row['Paid Amount']
                 
-                # Skip the user if they have fully paid
+                # Skip fully paid users
                 if pending_amount <= 0:
                     continue
 
@@ -241,32 +243,19 @@ else:
                 category = categorize(days)
                 risk = calculate_risk(days, pending_amount, row['Industry'], row['City'])
                 credit = calculate_credit_score(days, pending_amount)
-
                 prob = predict_recovery_probability(days, pending_amount, category)
                 expected = pending_amount * prob
-
                 msg = generate_ai_message(row['Name'], pending_amount, days, category, row['Industry'])
 
-                # SAVE USER DATA
-                cursor.execute("""
-                INSERT INTO transactions (username, customer, amount, due_date, industry, city, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    st.session_state.user,
-                    row['Name'],
-                    pending_amount,
-                    row['Due Date'],
-                    row['Industry'],
-                    row['City'],
-                    "Pending"
-                ))
-                conn.commit()
-
+                # Store all context for the dataframe and DB
                 results.append({
                     "Name": row['Name'],
                     "Amount": pending_amount,
+                    "Due Date": row['Due Date'],
+                    "Industry": row['Industry'],
+                    "City": row['City'],
                     "Days": days,
-                    "Risk": round(risk, 2),
+                    "Risk Score": round(risk, 2),
                     "Category": category,
                     "Credit Score": credit,
                     "Recovery %": round(prob * 100, 1),
@@ -277,61 +266,99 @@ else:
             result_df = pd.DataFrame(results)
 
             if result_df.empty:
-                st.success("All amounts have been fully paid. No pending recoveries!")
+                st.success("All outstanding balances have been fully paid. No pending recoveries!")
             else:
+                st.markdown("---")
+                st.subheader("📋 Processed Recovery Data")
+                
+                # Display tabular format of the authentic data without the long message column
+                st.dataframe(result_df.drop(columns=["Message"]), use_container_width=True)
+                
+                # Button to optionally save data to DB
+                if st.button("💾 Save Data to System"):
+                    for _, row in result_df.iterrows():
+                        cursor.execute("""
+                        INSERT INTO transactions (username, customer, amount, due_date, industry, city, status)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            st.session_state.user, row['Name'], row['Amount'], 
+                            row['Due Date'], row['Industry'], row['City'], "Pending"
+                        ))
+                    conn.commit()
+                    st.success("Data securely saved to your transaction records!")
+
                 # KPIs
+                st.markdown("---")
+                st.subheader("🎯 Recovery Targets")
                 c1, c2, c3, c4 = st.columns(4)
-                c1.metric("Total Due", f"₹{result_df['Amount'].sum():,.0f}")
-                c2.metric("Expected", f"₹{result_df['Expected'].sum():,.0f}")
-                c3.metric("High Risk", len(result_df[result_df["Category"] == "High"]))
-                c4.metric("Avg Recovery", f"{result_df['Recovery %'].mean():.1f}%")
+                c1.metric("Total Pending Due", f"₹{result_df['Amount'].sum():,.0f}")
+                c2.metric("Expected Recovery", f"₹{result_df['Expected'].sum():,.0f}")
+                c3.metric("High Risk Accounts", len(result_df[result_df["Category"] == "High"]))
+                c4.metric("Avg Recovery Prob.", f"{result_df['Recovery %'].mean():.1f}%")
 
                 # Charts
-                st.plotly_chart(px.bar(result_df, x="Name", y="Risk"))
-                st.plotly_chart(px.pie(result_df, names="Category"))
+                st.markdown("<br>", unsafe_allow_html=True)
+                col_chart1, col_chart2 = st.columns(2)
+                with col_chart1:
+                    fig1 = px.bar(result_df, x="Name", y="Risk Score", title="Risk Score by Customer")
+                    st.plotly_chart(fig1, use_container_width=True)
+                with col_chart2:
+                    fig2 = px.pie(result_df, names="Category", title="Account Risk Category Distribution")
+                    st.plotly_chart(fig2, use_container_width=True)
 
                 # Forecast
                 result_df["Index"] = range(1, len(result_df) + 1)
                 result_df["Cum"] = result_df["Expected"].cumsum()
-                st.plotly_chart(px.line(result_df, x="Index", y="Cum", title="Recovery Forecast"))
+                fig_line = px.line(result_df, x="Index", y="Cum", title="Expected Recovery Forecast (Cumulative Path)")
+                st.plotly_chart(fig_line, use_container_width=True)
 
-                # WhatsApp Simulation
-                st.subheader("📲 WhatsApp Simulation")
-                for i, row in result_df.iterrows():
-                    with st.expander(row["Name"]):
-                        st.write(row["Message"])
-
-                        if st.button("Send", key=f"send_{i}"):
-                            st.success("Sent ✅")
-
-                        if st.button("Mark Paid", key=f"paid_{i}"):
+                # Improved WhatsApp Simulation UI
+                st.markdown("---")
+                st.subheader("📲 WhatsApp Communication Hub")
+                st.write("Select a customer from the dropdown below to preview and send targeted payment reminders.")
+                
+                customer_list = result_df["Name"].tolist()
+                selected_customer = st.selectbox("Select Target Customer:", customer_list)
+                
+                if selected_customer:
+                    customer_info = result_df[result_df["Name"] == selected_customer].iloc[0]
+                    
+                    st.info(f"**Draft Message:**\n\n{customer_info['Message']}")
+                    
+                    btn_col1, btn_col2 = st.columns(2)
+                    with btn_col1:
+                        if st.button("Send WhatsApp 💬", key="send_wa", use_container_width=True):
+                            st.success(f"Reminder sent successfully to {selected_customer}! ✅")
+                    with btn_col2:
+                        if st.button("Mark as Recovered 💰", key="mark_paid", use_container_width=True):
                             cursor.execute("""
                             UPDATE transactions
                             SET status='Recovered'
                             WHERE customer=? AND username=?
-                            """, (row["Name"], st.session_state.user))
+                            """, (selected_customer, st.session_state.user))
                             conn.commit()
-                            st.success("Marked as Recovered ✅")
+                            st.success(f"Outstanding amount for {selected_customer} has been marked as recovered! ✅")
 
             # Performance Tracking
             st.markdown("---")
-            st.subheader("📊 Recovery Performance")
+            st.subheader("📈 Personal Recovery Performance")
 
             history = pd.read_sql(f"""
             SELECT * FROM transactions WHERE username='{st.session_state.user}'
             """, conn)
 
             if not history.empty:
-                total = len(history)
-                recovered = len(history[history["status"] == "Recovered"])
-                rate = (recovered / total) * 100 if total else 0
+                total_cases = len(history)
+                recovered_cases = len(history[history["status"] == "Recovered"])
+                recovery_rate = (recovered_cases / total_cases) * 100 if total_cases else 0
 
                 p1, p2, p3 = st.columns(3)
-                p1.metric("Total Cases", total)
-                p2.metric("Recovered", recovered)
-                p3.metric("Recovery Rate", f"{rate:.1f}%")
+                p1.metric("Total Cases Assigned", total_cases)
+                p2.metric("Cases Recovered", recovered_cases)
+                p3.metric("Recovery Success Rate", f"{recovery_rate:.1f}%")
 
                 history["id"] = history["id"].astype(int)
-                st.plotly_chart(px.line(history, x="id", y="amount"))
-
-            st.dataframe(result_df)
+                fig_perf = px.line(history, x="id", y="amount", title="Historical Recovery Task Trend")
+                st.plotly_chart(fig_perf, use_container_width=True)
+            else:
+                st.write("Save some data to the system to track your historical recovery performance.")
