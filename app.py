@@ -166,6 +166,12 @@ def generate_pdf_report(df):
     pdf = FPDF()
     pdf.add_page()
     
+    # NEW: Helper function to scrub emojis and Rupee symbols for the PDF
+    def clean_txt(text):
+        text = str(text).replace("₹", "Rs.").replace("⚠️", "[URGENT]")
+        # This safely ignores any other special characters that might crash the PDF
+        return text.encode('latin-1', 'ignore').decode('latin-1')
+    
     # Header
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(200, 10, txt="KhataKhat - Active Recovery Report", ln=True, align='C')
@@ -183,11 +189,15 @@ def generate_pdf_report(df):
     pdf.set_font("Arial", size=10)
     for index, row in df.iterrows():
         pdf.set_font("Arial", 'B', 10)
-        pdf.cell(0, 8, txt=f"Customer: {row['Name']} ({row['Industry']} - {row['City']})", ln=True)
+        pdf.cell(0, 8, txt=clean_txt(f"Customer: {row['Name']} ({row['Industry']} - {row['City']})"), ln=True)
         pdf.set_font("Arial", size=10)
-        pdf.cell(0, 6, txt=f"Due: Rs. {row['Amount']} | Days Overdue: {row['Days']} | Risk: {row['Category']}", ln=True)
+        pdf.cell(0, 6, txt=clean_txt(f"Due: Rs. {row['Amount']} | Days Overdue: {row['Days']} | Risk: {row['Category']}"), ln=True)
         pdf.set_text_color(100, 100, 100)
-        pdf.multi_cell(0, 6, txt=f"Auto-Message: {row['Message']}")
+        
+        # Clean the message text before printing to PDF
+        clean_msg = clean_txt(f"Auto-Message: {row['Message']}")
+        pdf.multi_cell(0, 6, txt=clean_msg)
+        
         pdf.set_text_color(0, 0, 0)
         pdf.ln(4)
         
