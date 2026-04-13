@@ -531,6 +531,6 @@ else:
 # -------------------------------
 st.markdown("""
     <div style='text-align: center; margin-top: 60px; padding: 20px; color: #64748b; font-size: 14px; font-weight: 500;'>
-        Copyright by Krishna Dua
+        Copyright by Ebin Davis
     </div>
 """, unsafe_allow_html=True)
