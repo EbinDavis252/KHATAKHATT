@@ -457,8 +457,14 @@ else:
                 p2.metric("Cases Recovered", recovered_cases)
                 p3.metric("Recovery Success Rate", f"{recovery_rate:.1f}%")
 
-                history["id"] = history["id"].astype(int)
-                fig_perf = px.line(history, x="id", y="amount", title="Historical Recovery Task Trend")
+                # 1. Force both columns to be strict, safe numbers
+                history["id"] = pd.to_numeric(history["id"], errors='coerce')
+                history["amount"] = pd.to_numeric(history["amount"], errors='coerce')
+                
+                # 2. Give Plotly ONLY the columns it needs so it doesn't choke on anything else
+                safe_plot_data = history[["id", "amount"]]
+                
+                fig_perf = px.line(safe_plot_data, x="id", y="amount", title="Historical Recovery Task Trend")
                 st.plotly_chart(fig_perf, use_container_width=True)
                 st.info("💡 **Smart Advice:** This shows your progress. As the line moves right, you want to see more accounts marked as 'Recovered'. Keep following up!")
             else:
