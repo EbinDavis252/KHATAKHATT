@@ -8,18 +8,18 @@ from fpdf import FPDF
 import urllib.parse
 
 # -------------------------------
-# CONFIG + PREMIUM UI BRANDING
+# CONFIG + HIGH-VISIBILITY UI
 # -------------------------------
 st.set_page_config(page_title="KhataKhat AI", layout="wide", initial_sidebar_state="collapsed")
 
-# Premium Light/Corporate Theme CSS
+# Clean, High-Contrast Corporate Theme
 st.markdown("""
 <style>
-/* Soft Premium Background */
+/* Crisp Background & Highly Legible Text */
 .stApp {
-    background-color: #f8fafc;
-    color: #334155;
-    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background-color: #f4f6f9;
+    color: #1e293b;
+    font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif;
 }
 /* Hide default Streamlit branding */
 #MainMenu {visibility: hidden;}
@@ -28,28 +28,27 @@ footer {visibility: hidden;}
 /* Professional Headers */
 h1, h2, h3 { 
     color: #0f766e !important; 
-    font-weight: 700; 
+    font-weight: 800; 
     letter-spacing: -0.5px;
 }
 
-/* Light Glassmorphism Metric Cards */
+/* High-Contrast Metric Cards */
 div[data-testid="metric-container"] {
     background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-left: 4px solid #0d9488;
-    padding: 1.2rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    transition: transform 0.2s ease;
-}
-div[data-testid="metric-container"]:hover {
-    transform: translateY(-2px);
+    border: 1px solid #cbd5e1;
+    border-left: 5px solid #0d9488;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
 }
 div[data-testid="metric-container"] label {
-    color: #64748b !important;
+    color: #475569 !important;
+    font-weight: 600 !important;
+    font-size: 1.1rem !important;
 }
 div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
     color: #0f172a !important;
+    font-weight: 800 !important;
 }
 
 /* Clean Tabs */
@@ -60,17 +59,32 @@ button[data-baseweb="tab"] {
 }
 button[aria-selected="true"] {
     color: #0d9488 !important;
-    border-bottom: 2px solid #0d9488 !important;
+    border-bottom: 3px solid #0d9488 !important;
 }
 
-/* Dataframe styling */
+/* Dataframe styling for visibility */
 .stDataFrame {
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    background: #ffffff;
 }
 </style>
 """, unsafe_allow_html=True)
+
+# -------------------------------
+# CORE FIX: UNICODE SANITIZER
+# -------------------------------
+def sanitize_dataframe_for_st(df):
+    """
+    Prevents Streamlit PyArrow UnicodeDecodeError by aggressively 
+    cleaning dataframe columns before rendering.
+    """
+    if df.empty:
+        return df
+    clean_df = df.copy()
+    for col in clean_df.columns:
+        clean_df[col] = clean_df[col].astype(str).str.encode('utf-8', 'ignore').str.decode('utf-8')
+    return clean_df
 
 # -------------------------------
 # STATE & LANGUAGE MANAGER
@@ -81,16 +95,15 @@ if "lang" not in st.session_state:
 def t(en_text, hi_text):
     return en_text if st.session_state.lang == "English" else hi_text
 
-# Custom Jaankari Box (Clean Light Theme)
 def jaankari_box(obs_en, act_en, obs_hi, act_hi):
     obs = obs_en if st.session_state.lang == "English" else obs_hi
     act = act_en if st.session_state.lang == "English" else act_hi
     
     st.markdown(f"""
-    <div style="background: #ffffff; border-left: 4px solid #0ea5e9; padding: 16px; border-radius: 6px; margin-top: 15px; margin-bottom: 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e0f2fe;">
-        <h4 style="color: #0369a1; margin-top: 0px; margin-bottom: 10px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;">⚡ Jaankari (जानकारी)</h4>
-        <p style="margin-bottom: 8px; font-size: 14px; color: #334155;"><strong style="color: #0f172a;">{t('Observation:', 'स्थिति:')}</strong> {obs}</p>
-        <p style="margin-bottom: 0px; font-size: 14px; color: #334155;"><strong style="color: #0f172a;">{t('Action Plan:', 'सुझाव:')}</strong> {act}</p>
+    <div style="background: #ffffff; border-left: 5px solid #0284c7; padding: 18px; border-radius: 6px; margin-top: 15px; margin-bottom: 25px; box-shadow: 0 3px 6px rgba(0,0,0,0.06); border: 1px solid #e0f2fe;">
+        <h4 style="color: #0369a1; margin-top: 0px; margin-bottom: 10px; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">⚡ Jaankari (जानकारी)</h4>
+        <p style="margin-bottom: 8px; font-size: 15px; color: #334155;"><strong style="color: #0f172a;">{t('Observation:', 'स्थिति:')}</strong> {obs}</p>
+        <p style="margin-bottom: 0px; font-size: 15px; color: #334155;"><strong style="color: #0f172a;">{t('Action Plan:', 'सुझाव:')}</strong> {act}</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -251,20 +264,19 @@ if not st.session_state.logged_in:
 else:
     # --- MAIN DASHBOARD SCREEN ---
     
-    # Top Navigation / Toolbar
     nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([4, 2, 2, 1])
     with nav_col1:
-        st.markdown(f"<h2 style='margin-top: -10px;'>💸 KhataKhat <span style='color: #64748b; font-size: 20px; font-weight: 400;'>| {t('Enterprise Receivables', 'स्मार्ट व्यापार वसूली')}</span></h2>", unsafe_allow_html=True)
+        st.markdown(f"<h2 style='margin-top: -10px;'>💸 KhataKhat <span style='color: #64748b; font-size: 22px; font-weight: 500;'>| {t('Enterprise Receivables', 'स्मार्ट व्यापार वसूली')}</span></h2>", unsafe_allow_html=True)
     with nav_col2:
         st.session_state.lang = st.radio("Language", ["English", "हिंदी"], horizontal=True, label_visibility="collapsed", key="lang_main")
     with nav_col3:
-        st.markdown(f"<div style='text-align: right; padding-top: 5px; font-weight: bold;'>{t('User:', 'यूज़र:')} {st.session_state.user}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align: right; padding-top: 5px; font-size: 16px; font-weight: bold;'>{t('User:', 'यूज़र:')} <span style='color: #0d9488;'>{st.session_state.user}</span></div>", unsafe_allow_html=True)
     with nav_col4:
         if st.button(t("Log Out", "लॉग आउट"), use_container_width=True):
             st.session_state.logged_in = False
             st.rerun()
 
-    st.markdown("<hr style='margin-top: 0px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin-top: 0px; margin-bottom: 20px; border-color: #cbd5e1;'>", unsafe_allow_html=True)
 
     tab_names = [t("📊 Macro Insights", "📊 बाज़ार की जानकारी"), t("💸 Recovery Engine", "💸 वसूली इंजन")]
     is_admin = st.session_state.user == "admin"
@@ -316,17 +328,19 @@ else:
 
     # ---------------- RECOVERY ENGINE ----------------
     with tabs[1]:
-        st.markdown(f"<p style='color: #64748b;'>{t('Please upload your current receivables ledger. File must be named', 'कृपया अपना डेटा अपलोड करें। फ़ाइल का नाम होना चाहिए')} <b>udhaar_data.csv</b>.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color: #475569; font-size: 16px;'>{t('Please upload your current receivables ledger. File must be named', 'कृपया अपना डेटा अपलोड करें। फ़ाइल का नाम होना चाहिए')} <b>udhaar_data.csv</b>.</p>", unsafe_allow_html=True)
+        
+        # FIX: Added encoding_errors='ignore' to prevent CSV reading crashes
         file = st.file_uploader("", type=["csv"])
 
         if file:
-            df = pd.read_csv(file)
+            df = pd.read_csv(file, encoding='utf-8', encoding_errors='ignore')
             required_cols = ["Name", "Amount", "Paid Amount", "Due Date", "Industry", "City"]
             if not all(col in df.columns for col in required_cols):
                 st.error(t(f"Schema mismatch. Required headers: {', '.join(required_cols)}", f"फ़ाइल गलत है। ज़रूरी कॉलम: {', '.join(required_cols)}"))
                 st.stop()
             
-            # Robust Date Parsing Fix
+            # FIX: Robust Date Parsing
             df['Due Date'] = pd.to_datetime(df['Due Date'], errors='coerce')
 
             results = []
@@ -341,7 +355,6 @@ else:
                 prob = predict_recovery_probability(days, pending_amount, category)
                 expected = pending_amount * prob
                 
-                # Convert date back to string for display/DB storage
                 display_date = row['Due Date'].strftime('%Y-%m-%d') if pd.notnull(row['Due Date']) else "N/A"
                 msg = generate_ai_message(row['Name'], pending_amount, days, category, row['Industry'])
 
@@ -359,7 +372,10 @@ else:
             else:
                 st.markdown("---")
                 st.subheader(t("📋 Live Ledger Analysis", "📋 लाइव डेटा रिपोर्ट"))
-                st.dataframe(result_df.drop(columns=["Message"]), use_container_width=True)
+                
+                # FIX: Clean DataFrame before displaying
+                clean_result_df = sanitize_dataframe_for_st(result_df.drop(columns=["Message"]))
+                st.dataframe(clean_result_df, use_container_width=True)
                 
                 if st.button(t("💾 Synchronize to Database", "💾 डेटाबेस में सेव करें")):
                     for _, row in result_df.iterrows():
@@ -419,9 +435,9 @@ else:
                 if selected_customer:
                     customer_info = result_df[result_df["Name"] == selected_customer].iloc[0]
                     st.markdown(f"""
-                    <div style="background: #f1f5f9; padding: 15px; border-radius: 5px; border-left: 3px solid #6366f1;">
-                        <span style="color: #4f46e5; font-weight: bold; font-size: 12px;">{t('GENERATED COMMUNICATION DRAFT', 'तैयार किया गया मैसेज')}</span><br><br>
-                        <span style="color: #334155;">{customer_info['Message']}</span>
+                    <div style="background: #f8fafc; padding: 18px; border-radius: 8px; border-left: 4px solid #4f46e5; border: 1px solid #e2e8f0;">
+                        <span style="color: #4338ca; font-weight: bold; font-size: 14px;">{t('GENERATED COMMUNICATION DRAFT', 'तैयार किया गया मैसेज')}</span><br><br>
+                        <span style="color: #1e293b; font-size: 15px;">{customer_info['Message']}</span>
                     </div>
                     """, unsafe_allow_html=True)
                     st.markdown("<br>", unsafe_allow_html=True)
@@ -429,6 +445,8 @@ else:
                     btn_col1, btn_col2 = st.columns(2)
                     with btn_col1:
                         target_phone = st.text_input(t("Target MSISDN (include country code, no +)", "ग्राहक का फोन नंबर (91 के साथ)"), value="919876543210")
+                        
+                        # FIX: Clean phone string for the URL
                         clean_phone = target_phone.replace("+", "").replace(" ", "").strip()
                         encoded_msg = urllib.parse.quote(customer_info['Message'])
                         wa_link = f"https://wa.me/{clean_phone}?text={encoded_msg}"
@@ -446,6 +464,7 @@ else:
                     with btn_col2:
                         st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
                         if st.button(t("Reconcile Account (Mark Paid)", "पैसा मिल गया (मार्क करें) 💰"), type="primary", use_container_width=True):
+                            # FIX: Target specific pending transaction to avoid overwriting all history
                             cursor.execute("UPDATE transactions SET status='Recovered' WHERE customer=? AND username=? AND amount=? AND status='Pending'", (selected_customer, st.session_state.user, customer_info['Amount']))
                             conn.commit()
                             st.success(f"{t('Ledger updated: Capital from', 'अकाउंट अपडेट:')} {selected_customer} {t('recovered.', 'से पैसा मिल गया! ✅')}")
@@ -454,8 +473,11 @@ else:
                 st.markdown("---")
                 st.subheader(t("📈 Active Recovery History", "📈 आपका रिकवरी इतिहास"))
                 history_df = pd.read_sql("SELECT customer, amount, due_date, status FROM transactions WHERE username=?", conn, params=(st.session_state.user,))
+                
                 if not history_df.empty:
-                    st.dataframe(history_df, use_container_width=True)
+                    # FIX: Apply sanitization to completely eliminate UnicodeDecodeError
+                    clean_history = sanitize_dataframe_for_st(history_df)
+                    st.dataframe(clean_history, use_container_width=True)
                 else:
                     st.info(t("No recovery records found. Sync data or log a transmission above.", "अभी तक कोई रिकवरी रिकॉर्ड नहीं है।"))
 
@@ -477,20 +499,24 @@ else:
             st.header(t("🛡️ Database Operations", "🛡️ एडमिन पैनल"))
             st.subheader(t("Transmission Logs", "व्हाट्सएप लॉग्स"))
             comm_data = pd.read_sql("SELECT * FROM communications ORDER BY id DESC", conn)
-            if not comm_data.empty: st.dataframe(comm_data, use_container_width=True)
-            else: st.info(t("Ledger empty.", "कोई रिकॉर्ड नहीं है।"))
+            if not comm_data.empty: 
+                st.dataframe(sanitize_dataframe_for_st(comm_data), use_container_width=True)
+            else: 
+                st.info(t("Ledger empty.", "कोई रिकॉर्ड नहीं है।"))
                 
             st.markdown("---")
             st.subheader(t("Master Transaction Ledger", "मास्टर डेटाबेस"))
             tx_data = pd.read_sql("SELECT * FROM transactions", conn)
-            if not tx_data.empty: st.dataframe(tx_data, use_container_width=True)
-            else: st.info(t("Ledger empty.", "डेटाबेस खाली है।"))
+            if not tx_data.empty: 
+                st.dataframe(sanitize_dataframe_for_st(tx_data), use_container_width=True)
+            else: 
+                st.info(t("Ledger empty.", "डेटाबेस खाली है।"))
 
 # -------------------------------
 # COPYRIGHT FOOTER
 # -------------------------------
 st.markdown("""
-    <div style='text-align: center; margin-top: 50px; padding: 20px; color: #94a3b8; font-size: 14px;'>
+    <div style='text-align: center; margin-top: 60px; padding: 20px; color: #64748b; font-size: 15px; font-weight: 600;'>
         Copyright by Ebin Davis
     </div>
 """, unsafe_allow_html=True)
