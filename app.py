@@ -221,23 +221,31 @@ else:
         if file:
             df = pd.read_csv(file)
 
-            required_cols = ["Name","Amount","Due Date","Industry","City"]
+            # Updated required_cols to check for Paid Amount too
+            required_cols = ["Name", "Amount", "Paid Amount", "Due Date", "Industry", "City"]
             if not all(col in df.columns for col in required_cols):
-                st.error("CSV format incorrect")
+                st.error(f"CSV format incorrect. Required columns: {', '.join(required_cols)}")
                 st.stop()
 
             results = []
 
             for _, row in df.iterrows():
+                # KD, here we calculate the actual pending amount!
+                pending_amount = row['Amount'] - row['Paid Amount']
+                
+                # Skip the user if they have fully paid
+                if pending_amount <= 0:
+                    continue
+
                 days = calculate_days_overdue(row['Due Date'])
                 category = categorize(days)
-                risk = calculate_risk(days, row['Amount'], row['Industry'], row['City'])
-                credit = calculate_credit_score(days, row['Amount'])
+                risk = calculate_risk(days, pending_amount, row['Industry'], row['City'])
+                credit = calculate_credit_score(days, pending_amount)
 
-                prob = predict_recovery_probability(days, row['Amount'], category)
-                expected = row['Amount'] * prob
+                prob = predict_recovery_probability(days, pending_amount, category)
+                expected = pending_amount * prob
 
-                msg = generate_ai_message(row['Name'], row['Amount'], days, category, row['Industry'])
+                msg = generate_ai_message(row['Name'], pending_amount, days, category, row['Industry'])
 
                 # SAVE USER DATA
                 cursor.execute("""
@@ -246,7 +254,7 @@ else:
                 """, (
                     st.session_state.user,
                     row['Name'],
-                    row['Amount'],
+                    pending_amount,
                     row['Due Date'],
                     row['Industry'],
                     row['City'],
@@ -256,51 +264,54 @@ else:
 
                 results.append({
                     "Name": row['Name'],
-                    "Amount": row['Amount'],
+                    "Amount": pending_amount,
                     "Days": days,
-                    "Risk": round(risk,2),
+                    "Risk": round(risk, 2),
                     "Category": category,
                     "Credit Score": credit,
-                    "Recovery %": round(prob*100,1),
-                    "Expected": round(expected,0),
+                    "Recovery %": round(prob * 100, 1),
+                    "Expected": round(expected, 0),
                     "Message": msg
                 })
 
             result_df = pd.DataFrame(results)
 
-            # KPIs
-            c1,c2,c3,c4 = st.columns(4)
-            c1.metric("Total Due", f"₹{result_df['Amount'].sum():,.0f}")
-            c2.metric("Expected", f"₹{result_df['Expected'].sum():,.0f}")
-            c3.metric("High Risk", len(result_df[result_df["Category"]=="High"]))
-            c4.metric("Avg Recovery", f"{result_df['Recovery %'].mean():.1f}%")
+            if result_df.empty:
+                st.success("All amounts have been fully paid. No pending recoveries!")
+            else:
+                # KPIs
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Total Due", f"₹{result_df['Amount'].sum():,.0f}")
+                c2.metric("Expected", f"₹{result_df['Expected'].sum():,.0f}")
+                c3.metric("High Risk", len(result_df[result_df["Category"] == "High"]))
+                c4.metric("Avg Recovery", f"{result_df['Recovery %'].mean():.1f}%")
 
-            # Charts
-            st.plotly_chart(px.bar(result_df, x="Name", y="Risk"))
-            st.plotly_chart(px.pie(result_df, names="Category"))
+                # Charts
+                st.plotly_chart(px.bar(result_df, x="Name", y="Risk"))
+                st.plotly_chart(px.pie(result_df, names="Category"))
 
-            # Forecast
-            result_df["Index"] = range(1,len(result_df)+1)
-            result_df["Cum"] = result_df["Expected"].cumsum()
-            st.plotly_chart(px.line(result_df, x="Index", y="Cum", title="Recovery Forecast"))
+                # Forecast
+                result_df["Index"] = range(1, len(result_df) + 1)
+                result_df["Cum"] = result_df["Expected"].cumsum()
+                st.plotly_chart(px.line(result_df, x="Index", y="Cum", title="Recovery Forecast"))
 
-            # WhatsApp Simulation
-            st.subheader("📲 WhatsApp Simulation")
-            for i,row in result_df.iterrows():
-                with st.expander(row["Name"]):
-                    st.write(row["Message"])
+                # WhatsApp Simulation
+                st.subheader("📲 WhatsApp Simulation")
+                for i, row in result_df.iterrows():
+                    with st.expander(row["Name"]):
+                        st.write(row["Message"])
 
-                    if st.button("Send", key=f"send_{i}"):
-                        st.success("Sent ✅")
+                        if st.button("Send", key=f"send_{i}"):
+                            st.success("Sent ✅")
 
-                    if st.button("Mark Paid", key=f"paid_{i}"):
-                        cursor.execute("""
-                        UPDATE transactions
-                        SET status='Recovered'
-                        WHERE customer=? AND username=?
-                        """, (row["Name"], st.session_state.user))
-                        conn.commit()
-                        st.success("Marked as Recovered ✅")
+                        if st.button("Mark Paid", key=f"paid_{i}"):
+                            cursor.execute("""
+                            UPDATE transactions
+                            SET status='Recovered'
+                            WHERE customer=? AND username=?
+                            """, (row["Name"], st.session_state.user))
+                            conn.commit()
+                            st.success("Marked as Recovered ✅")
 
             # Performance Tracking
             st.markdown("---")
@@ -312,10 +323,10 @@ else:
 
             if not history.empty:
                 total = len(history)
-                recovered = len(history[history["status"]=="Recovered"])
-                rate = (recovered/total)*100 if total else 0
+                recovered = len(history[history["status"] == "Recovered"])
+                rate = (recovered / total) * 100 if total else 0
 
-                p1,p2,p3 = st.columns(3)
+                p1, p2, p3 = st.columns(3)
                 p1.metric("Total Cases", total)
                 p2.metric("Recovered", recovered)
                 p3.metric("Recovery Rate", f"{rate:.1f}%")
