@@ -49,6 +49,18 @@ CREATE TABLE IF NOT EXISTS transactions (
 )
 """)
 
+# WhatsApp Communications (Admin Logs)
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS communications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    customer TEXT,
+    message TEXT,
+    timestamp TEXT,
+    status TEXT
+)
+""")
+
 conn.commit()
 
 # -------------------------------
@@ -69,6 +81,11 @@ def login_user(username, password):
     cursor.execute("SELECT * FROM users WHERE username=? AND password=?",
                    (username, hash_password(password)))
     return cursor.fetchone()
+
+# Auto-create an admin user for testing if it doesn't exist
+admin_check = cursor.execute("SELECT * FROM users WHERE username='admin'").fetchone()
+if not admin_check:
+    create_user("admin", "admin123")
 
 # -------------------------------
 # SESSION
@@ -187,11 +204,16 @@ else:
         st.session_state.logged_in = False
         st.rerun()
 
-    # Replaced Navigation Sidebar with Main Tabs
-    tab_market, tab_recovery = st.tabs(["📊 Market Insights", "💸 Recovery Engine"])
+    # Dynamic Tabs Setup
+    tab_names = ["📊 Market Insights", "💸 Recovery Engine"]
+    is_admin = st.session_state.user == "admin"
+    if is_admin:
+        tab_names.append("🛡️ Admin Panel")
+
+    tabs = st.tabs(tab_names)
 
     # ---------------- MARKET INSIGHTS ----------------
-    with tab_market:
+    with tabs[0]:
         st.header("📊 Market Intelligence")
 
         col1, col2, col3 = st.columns(3)
@@ -205,19 +227,22 @@ else:
             data = market_df.groupby("Industry")["Credit_Days"].mean().reset_index()
             fig = px.bar(data, x="Industry", y="Credit_Days", title="Average Allowed Credit Days by Industry")
             st.plotly_chart(fig, use_container_width=True)
+            st.info("💡 **AI Insight:** This chart highlights standard credit cycles across different industries. An industry with naturally long credit cycles (like Textiles) may not necessarily be in default if payments are slightly delayed, whereas fast-moving industries (like FMCG) expect rapid liquidity.")
 
         with sub_tab2:
             data = market_df.groupby("City")["Days_Delayed"].mean().reset_index()
             fig = px.bar(data, x="City", y="Days_Delayed", title="Average Payment Delay Days by City")
             st.plotly_chart(fig, use_container_width=True)
+            st.info("💡 **AI Insight:** Geographic delays often correlate with regional supply chain disruptions or localized economic trends. Identifying high-delay hubs allows you to prioritize human-led recovery efforts in those specific territories.")
 
         with sub_tab3:
             market_df["Risk"] = market_df["Days_Delayed"].apply(categorize)
             fig = px.pie(market_df, names="Risk", title="Market Risk Profiles Distribution")
             st.plotly_chart(fig, use_container_width=True)
+            st.info("💡 **AI Insight:** A macroscopic view of your portfolio's health. A heavily skewed 'High' risk slice indicates immediate systemic recovery actions are needed to stabilize cash flow.")
 
     # ---------------- RECOVERY ENGINE ----------------
-    with tab_recovery:
+    with tabs[1]:
         st.header("💸 Recovery Engine")
 
         file = st.file_uploader("Upload Recovery Data CSV", type=["csv"])
@@ -247,7 +272,6 @@ else:
                 expected = pending_amount * prob
                 msg = generate_ai_message(row['Name'], pending_amount, days, category, row['Industry'])
 
-                # Store all context for the dataframe and DB
                 results.append({
                     "Name": row['Name'],
                     "Amount": pending_amount,
@@ -270,11 +294,8 @@ else:
             else:
                 st.markdown("---")
                 st.subheader("📋 Processed Recovery Data")
-                
-                # Display tabular format of the authentic data without the long message column
                 st.dataframe(result_df.drop(columns=["Message"]), use_container_width=True)
                 
-                # Button to optionally save data to DB
                 if st.button("💾 Save Data to System"):
                     for _, row in result_df.iterrows():
                         cursor.execute("""
@@ -300,17 +321,21 @@ else:
                 st.markdown("<br>", unsafe_allow_html=True)
                 col_chart1, col_chart2 = st.columns(2)
                 with col_chart1:
-                    fig1 = px.bar(result_df, x="Name", y="Risk Score", title="Risk Score by Customer")
+                    fig1 = px.bar(result_df, x="Name", y="Risk Score", title="Proprietary Risk Score by Customer")
                     st.plotly_chart(fig1, use_container_width=True)
+                    st.info("💡 **AI Insight:** The risk score is a composite metric combining the total amount due, days delayed, and geographical risk factors. Higher bars require immediate manual intervention.")
+                
                 with col_chart2:
                     fig2 = px.pie(result_df, names="Category", title="Account Risk Category Distribution")
                     st.plotly_chart(fig2, use_container_width=True)
+                    st.info("💡 **AI Insight:** This segments your active recovery queue, enabling efficient resource allocation. Use automated text routing for 'Low' risk, and deploy human agents for 'High' risk accounts.")
 
                 # Forecast
                 result_df["Index"] = range(1, len(result_df) + 1)
                 result_df["Cum"] = result_df["Expected"].cumsum()
                 fig_line = px.line(result_df, x="Index", y="Cum", title="Expected Recovery Forecast (Cumulative Path)")
                 st.plotly_chart(fig_line, use_container_width=True)
+                st.info("💡 **AI Insight:** Visualizes the cumulative cash flow projection assuming AI probability rates hold true. Use this trajectory to set realistic monthly financial planning baselines.")
 
                 # Improved WhatsApp Simulation UI
                 st.markdown("---")
@@ -328,7 +353,16 @@ else:
                     btn_col1, btn_col2 = st.columns(2)
                     with btn_col1:
                         if st.button("Send WhatsApp 💬", key="send_wa", use_container_width=True):
+                            # Hidden Logic: Log this communication to the DB for the Admin Panel
+                            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            cursor.execute("""
+                            INSERT INTO communications (username, customer, message, timestamp, status)
+                            VALUES (?, ?, ?, ?, ?)
+                            """, (st.session_state.user, selected_customer, customer_info['Message'], timestamp, "Sent (Automated)"))
+                            conn.commit()
+                            
                             st.success(f"Reminder sent successfully to {selected_customer}! ✅")
+                            
                     with btn_col2:
                         if st.button("Mark as Recovered 💰", key="mark_paid", use_container_width=True):
                             cursor.execute("""
@@ -360,5 +394,31 @@ else:
                 history["id"] = history["id"].astype(int)
                 fig_perf = px.line(history, x="id", y="amount", title="Historical Recovery Task Trend")
                 st.plotly_chart(fig_perf, use_container_width=True)
+                st.info("💡 **AI Insight:** Tracks your effectiveness over time. An upward trend in the recovery success rate indicates your negotiation strategies and follow-up timings are improving.")
             else:
                 st.write("Save some data to the system to track your historical recovery performance.")
+
+    # ---------------- ADMIN PANEL ----------------
+    if is_admin:
+        with tabs[2]:
+            st.header("🛡️ Administrator Security Panel")
+            st.markdown("Welcome, System Administrator. This panel allows you to audit internal communications and monitor overall platform health.")
+            
+            st.subheader("📡 WhatsApp API Communication Logs")
+            st.markdown("Raw database records of all automated AI messages triggered via the Communication Hub.")
+            
+            comm_data = pd.read_sql("SELECT * FROM communications ORDER BY id DESC", conn)
+            if not comm_data.empty:
+                st.dataframe(comm_data, use_container_width=True)
+            else:
+                st.info("No communications have been dispatched yet.")
+                
+            st.markdown("---")
+            st.subheader("🗄️ Master Transaction Database")
+            st.markdown("Full unedited view of the `transactions` table containing all agent assignments and payment statuses.")
+            
+            tx_data = pd.read_sql("SELECT * FROM transactions", conn)
+            if not tx_data.empty:
+                st.dataframe(tx_data, use_container_width=True)
+            else:
+                st.info("The transaction database is currently empty.")
