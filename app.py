@@ -4,6 +4,8 @@ import sqlite3
 import hashlib
 from datetime import datetime
 import plotly.express as px
+from fpdf import FPDF
+import urllib.parse
 
 # -------------------------------
 # CONFIG + BRANDING
@@ -74,7 +76,7 @@ def create_user(username, password):
         cursor.execute("INSERT INTO users VALUES (?, ?)", (username, hash_password(password)))
         conn.commit()
         return True
-    except:
+    except sqlite3.IntegrityError:
         return False
 
 def login_user(username, password):
@@ -121,7 +123,7 @@ def calculate_days_overdue(due_date):
         today = datetime.today()
         due = datetime.strptime(str(due_date), "%Y-%m-%d")
         return max((today - due).days, 0)
-    except:
+    except ValueError:
         return 0
 
 def categorize(days):
@@ -144,11 +146,11 @@ def calculate_credit_score(days, amount):
 def generate_ai_message(name, amount, days, category, industry):
     link = f"upi://pay?pa=merchant@upi&am={amount}"
     if category == "Low":
-        return f"Hi {name}, a gentle reminder for your pending amount of ₹{amount}. Pay here: {link}"
+        return f"Hi {name}, a gentle reminder for your pending amount of Rs. {amount}. Pay here: {link}"
     elif category == "Medium":
-        return f"Hello {name}, ₹{amount} is currently pending. Most {industry} payments clear soon. Please complete yours: {link}"
+        return f"Hello {name}, Rs. {amount} is currently pending. Most {industry} payments clear soon. Please complete yours: {link}"
     else:
-        return f"⚠️ URGENT: {name}, ₹{amount} is overdue by {days} days. Immediate payment is required to maintain your credit score: {link}"
+        return f"⚠️ URGENT: {name}, Rs. {amount} is overdue by {days} days. Immediate payment is required: {link}"
 
 def predict_recovery_probability(days, amount, category):
     base = 0.8 - (days * 0.02)
@@ -159,6 +161,37 @@ def predict_recovery_probability(days, amount, category):
     elif category == "Medium":
         base -= 0.1
     return max(min(base, 1), 0)
+
+def generate_pdf_report(df):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Header
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, txt="KhataKhat - Active Recovery Report", ln=True, align='C')
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt=f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align='C')
+    pdf.ln(10)
+    
+    # Summary Metrics
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(200, 10, txt=f"Total Pending Due: Rs. {df['Amount'].sum():,.0f}", ln=True)
+    pdf.cell(200, 10, txt=f"Expected Recovery: Rs. {df['Expected'].sum():,.0f}", ln=True)
+    pdf.ln(5)
+    
+    # Data Rows
+    pdf.set_font("Arial", size=10)
+    for index, row in df.iterrows():
+        pdf.set_font("Arial", 'B', 10)
+        pdf.cell(0, 8, txt=f"Customer: {row['Name']} ({row['Industry']} - {row['City']})", ln=True)
+        pdf.set_font("Arial", size=10)
+        pdf.cell(0, 6, txt=f"Due: Rs. {row['Amount']} | Days Overdue: {row['Days']} | Risk: {row['Category']}", ln=True)
+        pdf.set_text_color(100, 100, 100)
+        pdf.multi_cell(0, 6, txt=f"Auto-Message: {row['Message']}")
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(4)
+        
+    return pdf.output(dest="S").encode("latin-1")
 
 # -------------------------------
 # LOGIN / REGISTER
@@ -227,19 +260,19 @@ else:
             data = market_df.groupby("Industry")["Credit_Days"].mean().reset_index()
             fig = px.bar(data, x="Industry", y="Credit_Days", title="Average Allowed Credit Days by Industry")
             st.plotly_chart(fig, use_container_width=True)
-            st.info("💡 **AI Insight:** This chart highlights standard credit cycles across different industries. An industry with naturally long credit cycles (like Textiles) may not necessarily be in default if payments are slightly delayed, whereas fast-moving industries (like FMCG) expect rapid liquidity.")
+            st.info("💡 **Smart Advice:** Your FMCG customers pay fast, but Textile buyers are holding your money the longest. Stop giving long credit to Textile buyers, or ask them for a 50% advance.")
 
         with sub_tab2:
             data = market_df.groupby("City")["Days_Delayed"].mean().reset_index()
             fig = px.bar(data, x="City", y="Days_Delayed", title="Average Payment Delay Days by City")
             st.plotly_chart(fig, use_container_width=True)
-            st.info("💡 **AI Insight:** Geographic delays often correlate with regional supply chain disruptions or localized economic trends. Identifying high-delay hubs allows you to prioritize human-led recovery efforts in those specific territories.")
+            st.info("💡 **Smart Advice:** Customers in Surat are taking almost 20 days extra to pay. Delhi is much safer right now. Be careful when taking new orders from Surat customers.")
 
         with sub_tab3:
             market_df["Risk"] = market_df["Days_Delayed"].apply(categorize)
             fig = px.pie(market_df, names="Risk", title="Market Risk Profiles Distribution")
             st.plotly_chart(fig, use_container_width=True)
-            st.info("💡 **AI Insight:** A macroscopic view of your portfolio's health. A heavily skewed 'High' risk slice indicates immediate systemic recovery actions are needed to stabilize cash flow.")
+            st.info("💡 **Smart Advice:** A big chunk of your money is stuck in 'High Risk'. Do not supply new goods to these delayed customers until they clear at least half of their old bills.")
 
     # ---------------- RECOVERY ENGINE ----------------
     with tabs[1]:
@@ -296,6 +329,15 @@ else:
                 st.subheader("📋 Processed Recovery Data")
                 st.dataframe(result_df.drop(columns=["Message"]), use_container_width=True)
                 
+                # PDF Download Button
+                pdf_bytes = generate_pdf_report(result_df)
+                st.download_button(
+                    label="📄 Download Detailed PDF Report",
+                    data=pdf_bytes,
+                    file_name=f"KhataKhat_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    mime="application/pdf"
+                )
+                
                 if st.button("💾 Save Data to System"):
                     for _, row in result_df.iterrows():
                         cursor.execute("""
@@ -323,19 +365,19 @@ else:
                 with col_chart1:
                     fig1 = px.bar(result_df, x="Name", y="Risk Score", title="Proprietary Risk Score by Customer")
                     st.plotly_chart(fig1, use_container_width=True)
-                    st.info("💡 **AI Insight:** The risk score is a composite metric combining the total amount due, days delayed, and geographical risk factors. Higher bars require immediate manual intervention.")
+                    st.info("💡 **Smart Advice:** The taller the bar, the higher the danger of losing your money. Call the customers with the highest bars TODAY. Don't just rely on WhatsApp for them.")
                 
                 with col_chart2:
                     fig2 = px.pie(result_df, names="Category", title="Account Risk Category Distribution")
                     st.plotly_chart(fig2, use_container_width=True)
-                    st.info("💡 **AI Insight:** This segments your active recovery queue, enabling efficient resource allocation. Use automated text routing for 'Low' risk, and deploy human agents for 'High' risk accounts.")
+                    st.info("💡 **Smart Advice:** Focus your own time on calling 'High Risk' accounts. For 'Low Risk', just use the KhataKhat automatic WhatsApp button—they usually pay with a simple reminder.")
 
                 # Forecast
                 result_df["Index"] = range(1, len(result_df) + 1)
                 result_df["Cum"] = result_df["Expected"].cumsum()
                 fig_line = px.line(result_df, x="Index", y="Cum", title="Expected Recovery Forecast (Cumulative Path)")
                 st.plotly_chart(fig_line, use_container_width=True)
-                st.info("💡 **AI Insight:** Visualizes the cumulative cash flow projection assuming AI probability rates hold true. Use this trajectory to set realistic monthly financial planning baselines.")
+                st.info("💡 **Smart Advice:** If you send reminders to everyone today, this line shows how much cash will likely hit your bank account this week. Use this estimate to plan your shop's next purchases.")
 
                 # Improved WhatsApp Simulation UI
                 st.markdown("---")
@@ -352,16 +394,31 @@ else:
                     
                     btn_col1, btn_col2 = st.columns(2)
                     with btn_col1:
-                        if st.button("Send WhatsApp 💬", key="send_wa", use_container_width=True):
-                            # Hidden Logic: Log this communication to the DB for the Admin Panel
+                        target_phone = st.text_input("Customer Phone (Include 91, no +)", value="919876543210")
+                        
+                        # 1. Encode the message so it formats perfectly in the URL
+                        encoded_msg = urllib.parse.quote(customer_info['Message'])
+                        
+                        # 2. Create the official WhatsApp redirect link
+                        wa_link = f"https://wa.me/{target_phone}?text={encoded_msg}"
+                        
+                        # 3. Streamlit's native link button opens WhatsApp directly!
+                        st.link_button("Send via WhatsApp 💬", wa_link, use_container_width=True)
+                        
+                        # 4. Dummy button just to show the Admin Panel updating during your demo
+                        if st.button("Log as Sent (For Demo)"):
                             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            cursor.execute("""
+                            INSERT INTO transactions (username, customer, amount, due_date, industry, city, status)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """, (st.session_state.user, selected_customer, customer_info['Amount'], customer_info['Due Date'], customer_info['Industry'], customer_info['City'], "Pending"))
+                            
                             cursor.execute("""
                             INSERT INTO communications (username, customer, message, timestamp, status)
                             VALUES (?, ?, ?, ?, ?)
-                            """, (st.session_state.user, selected_customer, customer_info['Message'], timestamp, "Sent (Automated)"))
+                            """, (st.session_state.user, selected_customer, customer_info['Message'], timestamp, "Sent (Demo Link)"))
                             conn.commit()
-                            
-                            st.success(f"Reminder sent successfully to {selected_customer}! ✅")
+                            st.success("Logged to Admin Panel! ✅")
                             
                     with btn_col2:
                         if st.button("Mark as Recovered 💰", key="mark_paid", use_container_width=True):
@@ -377,9 +434,8 @@ else:
             st.markdown("---")
             st.subheader("📈 Personal Recovery Performance")
 
-            history = pd.read_sql(f"""
-            SELECT * FROM transactions WHERE username='{st.session_state.user}'
-            """, conn)
+            # Fixed SQL injection vulnerability here
+            history = pd.read_sql("SELECT * FROM transactions WHERE username=?", conn, params=(st.session_state.user,))
 
             if not history.empty:
                 total_cases = len(history)
@@ -394,7 +450,7 @@ else:
                 history["id"] = history["id"].astype(int)
                 fig_perf = px.line(history, x="id", y="amount", title="Historical Recovery Task Trend")
                 st.plotly_chart(fig_perf, use_container_width=True)
-                st.info("💡 **AI Insight:** Tracks your effectiveness over time. An upward trend in the recovery success rate indicates your negotiation strategies and follow-up timings are improving.")
+                st.info("💡 **Smart Advice:** This shows your progress. As the line moves right, you want to see more accounts marked as 'Recovered'. Keep following up!")
             else:
                 st.write("Save some data to the system to track your historical recovery performance.")
 
@@ -404,8 +460,8 @@ else:
             st.header("🛡️ Administrator Security Panel")
             st.markdown("Welcome, System Administrator. This panel allows you to audit internal communications and monitor overall platform health.")
             
-            st.subheader("📡 WhatsApp API Communication Logs")
-            st.markdown("Raw database records of all automated AI messages triggered via the Communication Hub.")
+            st.subheader("📡 WhatsApp Communication Logs")
+            st.markdown("Raw database records of all messages triggered via the Communication Hub.")
             
             comm_data = pd.read_sql("SELECT * FROM communications ORDER BY id DESC", conn)
             if not comm_data.empty:
