@@ -359,7 +359,7 @@ def generate_pdf_report(df):
         pdf.set_font("Arial", size=10)
         pdf.cell(0, 6, txt=clean_txt(f"Due: Rs. {row['Amount']} | Days Overdue: {row['Days']} | Risk: {row['Category']}"), ln=True)
         pdf.ln(4)
-    return pdf.output(dest="S").encode("latin-1")
+    return bytes(pdf.output())
  
 # -------------------------------
 # APP ROUTING
